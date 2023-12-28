@@ -8,12 +8,16 @@ const FileList = ({dn, dp, email}) => {
     const [folderName, setFolderName] = useState('');
     const [isPopupVisible, setIsPopupVisible] = useState(false);
     const [droppedFileName, setDroppedFileName] = useState('DRAG AND DROP FILES HERE')
-    const basePath = '/Server/' + email;
+    const basePath = '/Users/Vishva/nas-server/' + email;
+    const [localPath, setLocalPath] = useState('MyDrive')
     const [isNotOnBase, setIsNotOnBase] = useState(false);
+    const [optionsDropDown, setOptionsDropDown] = useState(false);
+    const [selectedFile, setSelectedFile] = useState();
+    const IP_ADDRESS = 'localhost';
 
     const makeBasePath = async () => {
         try {
-            const response = await fetch(`http://localhost:3001/createFolder?path=` + basePath, {
+            const response = await fetch(`http://` + IP_ADDRESS + `:3001/createFolder?path=` + basePath, {
                 method: 'POST',
             });
       
@@ -36,7 +40,7 @@ const FileList = ({dn, dp, email}) => {
     const fetchFiles = async (p) => {
         try {
             setPath(p);
-            const response = await fetch('http://localhost:3001/getFiles?path=' + path);
+            const response = await fetch('http://' + IP_ADDRESS + ':3001/getFiles?path=' + path);
             const data = await response.json();
             setFiles(data);
         } catch (error) {
@@ -57,7 +61,7 @@ const FileList = ({dn, dp, email}) => {
     const fetchFolders = async (p) => {
         try {
             setPath(p);
-            const response = await fetch('http://localhost:3001/getFolders?path=' + path);
+            const response = await fetch('http://' + IP_ADDRESS + ':3001/getFolders?path=' + path);
             const data = await response.json();
             setFolders(data);
         } catch (error) {
@@ -74,11 +78,15 @@ const FileList = ({dn, dp, email}) => {
         pathArray.pop();
         const newPath = pathArray.join('/');
         setPath(newPath);
+
+        const localPathArray = localPath.split(' > ');
+        localPathArray.pop();
+        setLocalPath(localPathArray.join(' > '));
     };
 
     const downloadFile = async (f) => {
         try {
-            const response = await fetch(`http://localhost:3001/downloadFile?path=` + path + '/' + f);
+            const response = await fetch(`http://` + IP_ADDRESS + `:3001/downloadFile?path=` + path + '/' + f);
             const blob = await response.blob();
 
             // Create a link and trigger the download
@@ -94,7 +102,7 @@ const FileList = ({dn, dp, email}) => {
 
     const downloadFolder = async (fo) => {
         try {
-            const response = await fetch(`http://localhost:3001/downloadFolder?path=` + path + '/' + fo);
+            const response = await fetch(`http://` + IP_ADDRESS + `:3001/downloadFolder?path=` + path + '/' + fo);
             const blob = await response.blob();
         
             const link = document.createElement('a');
@@ -126,7 +134,7 @@ const FileList = ({dn, dp, email}) => {
         const formData = new FormData();
         formData.append('file', file);
         try {
-            const response = await fetch('http://localhost:3001/uploadFile?path=' + path, {
+            const response = await fetch('http://' + IP_ADDRESS + ':3001/uploadFile?path=' + path, {
                 method: 'POST',
                 body: formData,
             });
@@ -143,7 +151,7 @@ const FileList = ({dn, dp, email}) => {
 
     const deleteFile = async (f) => {
         try {
-            const response = await fetch(`http://localhost:3001/deleteFile?path=` + path + '/' + f, {
+            const response = await fetch(`http://` + IP_ADDRESS + `:3001/deleteFile?path=` + path + '/' + f, {
             method: 'DELETE',
             });
       
@@ -161,7 +169,7 @@ const FileList = ({dn, dp, email}) => {
 
     const deleteFolder = async (fo) => {
         try {
-          const response = await fetch(`http://localhost:3001/deleteFolder?path=` + path + '/' + fo, {
+          const response = await fetch(`http://` + IP_ADDRESS + `:3001/deleteFolder?path=` + path + '/' + fo, {
             method: 'DELETE',
           });
       
@@ -179,11 +187,11 @@ const FileList = ({dn, dp, email}) => {
 
     const handleFolderNameChange = (e) => {
         setFolderName(e.target.value);
-    }
+    };
 
     const createFolder = async () => {
         try {
-            const response = await fetch(`http://localhost:3001/createFolder?path=` + path + '/' + folderName, {
+            const response = await fetch(`http://` + IP_ADDRESS + `:3001/createFolder?path=` + path + '/' + folderName, {
                 method: 'POST',
             });
       
@@ -200,6 +208,20 @@ const FileList = ({dn, dp, email}) => {
         }
     };
 
+    const handleOptionsClick = (f) => {
+        setOptionsDropDown(true);
+        setSelectedFile(f);
+    };
+
+    const handleMouseEnter = (f) => {
+        setOptionsDropDown(true);
+        setSelectedFile(f);
+    };
+
+    const handleMouseLeave = () => {
+        setOptionsDropDown(false);
+        setSelectedFile();
+    };
 
     return (
         <html>
@@ -221,24 +243,39 @@ const FileList = ({dn, dp, email}) => {
                 <div class="directory">
                     {folders.map((fo) => (
                         <div class="folders">
-                            <div class="folder">
-                                <p class="folder-name">{fo}</p>
-                                <div class="operations">
-                                    <button class="open" type="button" onClick={() => setPath(path + '/' + fo)}>OPEN</button>            
-                                    <button class="download" type="button" onClick={() => downloadFolder(fo)}>DOWNLOAD</button>
-                                    <button class="delete" type="button" onClick={() => deleteFolder(fo)}>DELETE</button>
+                            <div class="card folder" onMouseEnter={() => handleMouseEnter(fo)} onMouseLeave={() => handleMouseLeave()} onClick={() => setPath(path + '/' + fo)}>
+                                <div class="visible">
+                                    <p class="folder-name">{fo}</p>
                                 </div>
+                                {optionsDropDown && selectedFile === fo && (
+                                    <div class="operations">         
+                                        <button class="download" type="button" onClick={() => downloadFolder(fo)}>
+                                            <img class="download-img" src="https://www.svgrepo.com/show/510957/download.svg" alt="DOWNLOAD" />
+                                        </button>
+                                        <button class="delete" type="button" onClick={() => deleteFolder(fo)}>
+                                            <img class="delete-img" src="https://www.svgrepo.com/show/533010/trash-alt.svg" alt="DELETE" />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
                     {files.map((f) => (
                         <div class="files">
-                            <div class="file">
-                                <p class="file-name">{f}</p>
-                                <div class="operations">
-                                    <button class="download" type="button" onClick={() => downloadFile(f)}>DOWNLOAD</button>
-                                    <button class="delete" type="button" onClick={() => deleteFile(f)}>DELETE</button>
+                            <div class="card file" onMouseEnter={() => handleMouseEnter(f)} onMouseLeave={() => handleMouseLeave()}>
+                                <div class="visible">
+                                    <p class="file-name">{f}</p>
                                 </div>
+                                {optionsDropDown && selectedFile === f && (
+                                    <div class="operations">          
+                                        <button class="download" type="button" onClick={() => downloadFile(f)}>
+                                            <img class="download-img" src="https://www.svgrepo.com/show/510957/download.svg" alt="DOWNLOAD" />
+                                        </button>
+                                        <button class="delete" type="button" onClick={() => deleteFile(f)}>
+                                            <img class="delete-img" src="https://www.svgrepo.com/show/533010/trash-alt.svg" alt="DELETE" />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
