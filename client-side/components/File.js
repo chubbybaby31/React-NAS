@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 
 const FileList = ({dn, dp, email}) => {
     const [files, setFiles] = useState([]);
@@ -8,22 +9,40 @@ const FileList = ({dn, dp, email}) => {
     const [folderName, setFolderName] = useState('');
     const [isPopupVisible, setIsPopupVisible] = useState(false);
     const [droppedFileName, setDroppedFileName] = useState('DRAG AND DROP FILES HERE')
-    const basePath = '/Users/Vishva/nas-server/' + email;
+    const basePath = '/Users/Vishva/nas-server/' + email + '/MyDrive';
+    const sharedPath = '/Users/Vishva/nas-server/' + email + '/Shared';
     const [localPath, setLocalPath] = useState('MyDrive')
-    const [isNotOnBase, setIsNotOnBase] = useState(false);
-    const [optionsDropDown, setOptionsDropDown] = useState(false);
-    const [selectedFile, setSelectedFile] = useState();
     const IP_ADDRESS = 'localhost';
+    const [isNotOnBase, setIsNotOnBase] = useState(false);
+    const [isShareVisible, setIsShareVisible] = useState(false);
+    const [shareEmail, setShareEmail] = useState('');
+    const [sharedFile, setSharedFile] = useState('');
+    const [isNotOnSharedPath, setIsNotOnSharedPath] = useState(true);
 
     const makeBasePath = async () => {
         try {
-            const response = await fetch(`http://` + IP_ADDRESS + `:3001/createFolder?path=` + basePath, {
+            const response = await fetch('http://' + IP_ADDRESS + ':3001/createFolder?path=' + basePath, {
                 method: 'POST',
             });
-      
+
             if (response.ok) {
                 const data = await response.json();
-                console.log(data.message);
+            } else {
+                console.error('Failed to create folder:', response.statusText);
+            }
+        } catch (error) {
+            console.error('Error creating folder:', error);
+        }
+    };
+
+    const makeSharedPath = async () => {
+        try {
+            const response = await fetch('http://' + IP_ADDRESS + ':3001/createFolder?path=' + sharedPath, {
+                method: 'POST',
+            });
+
+            if (response.ok) {
+                const data = await response.json();
             } else {
                 console.error('Failed to create folder:', response.statusText);
             }
@@ -33,6 +52,7 @@ const FileList = ({dn, dp, email}) => {
     };
 
     makeBasePath();
+    makeSharedPath();
     const [path, setPath] = useState(basePath);
 
 
@@ -43,6 +63,15 @@ const FileList = ({dn, dp, email}) => {
             const response = await fetch('http://' + IP_ADDRESS + ':3001/getFiles?path=' + path);
             const data = await response.json();
             setFiles(data);
+            let addLocal = p.split('/')[p.split('/').length - 1];
+            if (p === basePath) {
+                setLocalPath('My Drive');
+            } else if (p === sharedPath) {
+                setLocalPath('Shared Drive');
+            } else {
+                setLocalPath(localPath + ' > ' + addLocal);
+            }
+            console.log(files);
         } catch (error) {
             console.error('Error fetching data:', error);
         }
@@ -52,8 +81,15 @@ const FileList = ({dn, dp, email}) => {
     fetchFiles(path);
     if (basePath === path) {
         setIsNotOnBase(false);
+        setIsNotOnSharedPath(true);
+        setLocalPath('My Drive');
+    } else if (sharedPath === path) {
+        setIsNotOnBase(false);
+        setIsNotOnSharedPath(false);
+        setLocalPath('Shared Drive');
     } else {
         setIsNotOnBase(true);
+        setIsNotOnSharedPath(true);
     }
   }, [path, counter]);
 
@@ -78,15 +114,11 @@ const FileList = ({dn, dp, email}) => {
         pathArray.pop();
         const newPath = pathArray.join('/');
         setPath(newPath);
-
-        const localPathArray = localPath.split(' > ');
-        localPathArray.pop();
-        setLocalPath(localPathArray.join(' > '));
     };
 
     const downloadFile = async (f) => {
         try {
-            const response = await fetch(`http://` + IP_ADDRESS + `:3001/downloadFile?path=` + path + '/' + f);
+            const response = await fetch('http://' + IP_ADDRESS + ':3001/downloadFile?path=' + path + '/' + f);
             const blob = await response.blob();
 
             // Create a link and trigger the download
@@ -99,12 +131,11 @@ const FileList = ({dn, dp, email}) => {
         }
     };
 
-
     const downloadFolder = async (fo) => {
         try {
-            const response = await fetch(`http://` + IP_ADDRESS + `:3001/downloadFolder?path=` + path + '/' + fo);
+            const response = await fetch('http://' + IP_ADDRESS + ':3001/downloadFolder?path=' + path + '/' + fo);
             const blob = await response.blob();
-        
+
             const link = document.createElement('a');
             link.href = window.URL.createObjectURL(blob);
             link.download = fo + '.zip'; // Set a default name for the zip file
@@ -151,10 +182,10 @@ const FileList = ({dn, dp, email}) => {
 
     const deleteFile = async (f) => {
         try {
-            const response = await fetch(`http://` + IP_ADDRESS + `:3001/deleteFile?path=` + path + '/' + f, {
+            const response = await fetch('http://' + IP_ADDRESS + ':3001/deleteFile?path=' + path + '/' + f, {
             method: 'DELETE',
             });
-      
+
             if (response.ok) {
                 const data = await response.json();
                 console.log(data.message);
@@ -169,10 +200,10 @@ const FileList = ({dn, dp, email}) => {
 
     const deleteFolder = async (fo) => {
         try {
-          const response = await fetch(`http://` + IP_ADDRESS + `:3001/deleteFolder?path=` + path + '/' + fo, {
+          const response = await fetch('http://' + IP_ADDRESS + ':3001/deleteFolder?path=' + path + '/' + fo, {
             method: 'DELETE',
           });
-      
+
           if (response.ok) {
             const data = await response.json();
             console.log(data.message);
@@ -191,10 +222,10 @@ const FileList = ({dn, dp, email}) => {
 
     const createFolder = async () => {
         try {
-            const response = await fetch(`http://` + IP_ADDRESS + `:3001/createFolder?path=` + path + '/' + folderName, {
+            const response = await fetch('http://' + IP_ADDRESS + ':3001/createFolder?path=' + path + '/' + folderName, {
                 method: 'POST',
             });
-      
+
             if (response.ok) {
                 const data = await response.json();
                 console.log(data.message);
@@ -208,20 +239,28 @@ const FileList = ({dn, dp, email}) => {
         }
     };
 
-    const handleOptionsClick = (f) => {
-        setOptionsDropDown(true);
-        setSelectedFile(f);
+    const handleShare = async (f) => {
+        setIsShareVisible(true);
+        setSharedFile(f.name);
     };
 
-    const handleMouseEnter = (f) => {
-        setOptionsDropDown(true);
-        setSelectedFile(f);
+    const shareFile = async (sourceFilePath) => {
+        try {
+            const response = await axios.post('http://localhost:3001/shareFile?sourceFilePath=' + path + '/' + sharedFile + '&destinationPath=' + '/Users/Vishva/nas-server/' + shareEmail + '/Shared');
+    
+            console.log(response.data.message); // Success message
+            setIsShareVisible(false);
+            setSharedFile('');
+            setShareEmail('');
+        } catch (error) {
+            console.error('Error sharing file:', error.response.data.error);
+        }
     };
 
-    const handleMouseLeave = () => {
-        setOptionsDropDown(false);
-        setSelectedFile();
-    };
+    const handleShareEmailChange = (e) => {
+        setShareEmail(e.target.value);
+    }
+
 
     return (
         <html>
@@ -232,50 +271,61 @@ const FileList = ({dn, dp, email}) => {
                         <div class="user-name">{dn}</div>
                     </div>
                 </div>
-                <button class="initial-upload" onClick={() => setIsPopupVisible(true)}>+</button>
+                {isNotOnSharedPath && (
+                <button class="initial-upload" onClick={() => setIsPopupVisible(true)}>
+                    <img class="initial-upload-img" src="https://www.svgrepo.com/show/532994/plus.svg" alt="ADD"/>
+                </button>)}
                 <button class="home" onClick={() => setPath(basePath)}>
                     <img class="home-icon" src="https://www.svgrepo.com/show/22031/home-icon-silhouette.svg"/>
                 </button>
+                <button class="shared-drive" onClick={() => setPath(sharedPath)}>
+                    <img class="share-nav-img" src="https://www.svgrepo.com/show/506316/share-1.svg" alt="SHARE"/>
+                </button>
             </div>
             <div class="main"> 
+            <div class="top-bar">
+                <p class="local-path">{localPath}</p>
                 {isNotOnBase? <button class="back" type="button" onClick={navigateBack}>BACK</button>:
                 <div></div>}
+            </div>
                 <div class="directory">
-                    {folders.map((fo) => (
+                    {Array.isArray(folders) && folders.map((fo) => (
                         <div class="folders">
-                            <div class="card folder" onMouseEnter={() => handleMouseEnter(fo)} onMouseLeave={() => handleMouseLeave()} onClick={() => setPath(path + '/' + fo)}>
-                                <div class="visible">
-                                    <p class="folder-name">{fo}</p>
+                            <div class="folder">
+                                <p class="folder-name">{fo.name}</p>
+                                <div class="operations">
+                                    <p class="creation-date">{fo.createdAt.toLocaleString()}</p>
+                                    <p class="size">{fo.size}</p>
+                                    <button class="open" onClick={() => setPath(path + '/' + fo.name)}>
+                                        <img class="open-img" src="https://www.svgrepo.com/show/510096/open-folder.svg" alt="OPEN"/>
+                                    </button>
+                                    <button class="download" type="button" onClick={() => downloadFolder(fo.name)}>
+                                        <img class="download-img" src="https://www.svgrepo.com/show/510957/download.svg" alt="DOWNLOAD" />
+                                    </button>
+                                    <button class="delete" type="button" onClick={() => deleteFolder(fo.name)}>
+                                        <img class="delete-img" src="https://www.svgrepo.com/show/533010/trash-alt.svg" alt="DELETE" />
+                                    </button>
                                 </div>
-                                {optionsDropDown && selectedFile === fo && (
-                                    <div class="operations">         
-                                        <button class="download" type="button" onClick={() => downloadFolder(fo)}>
-                                            <img class="download-img" src="https://www.svgrepo.com/show/510957/download.svg" alt="DOWNLOAD" />
-                                        </button>
-                                        <button class="delete" type="button" onClick={() => deleteFolder(fo)}>
-                                            <img class="delete-img" src="https://www.svgrepo.com/show/533010/trash-alt.svg" alt="DELETE" />
-                                        </button>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     ))}
-                    {files.map((f) => (
+                    {Array.isArray(files) && files.map((f) => (
                         <div class="files">
-                            <div class="card file" onMouseEnter={() => handleMouseEnter(f)} onMouseLeave={() => handleMouseLeave()}>
-                                <div class="visible">
-                                    <p class="file-name">{f}</p>
+                            <div class="file">
+                                <p class="file-name">{f.name}</p>
+                                <div class="operations">
+                                    <p class="creation-date">{f.createdAt.toLocaleString()}</p>
+                                    <p class="size">{f.size}</p>
+                                    <button class="share-button" onClick={() => handleShare(f)}>
+                                        <img class="share-img" src="https://www.svgrepo.com/show/506316/share-1.svg" alt="SHARE"/>
+                                    </button>
+                                    <button class="download" type="button" onClick={() => downloadFile(f.name)}>
+                                        <img class="download-img" src="https://www.svgrepo.com/show/510957/download.svg" alt="DOWNLOAD" />
+                                    </button>
+                                    <button class="delete" type="button" onClick={() => deleteFile(f.name)}>
+                                        <img class="delete-img" src="https://www.svgrepo.com/show/533010/trash-alt.svg" alt="DELETE" />
+                                    </button>
                                 </div>
-                                {optionsDropDown && selectedFile === f && (
-                                    <div class="operations">          
-                                        <button class="download" type="button" onClick={() => downloadFile(f)}>
-                                            <img class="download-img" src="https://www.svgrepo.com/show/510957/download.svg" alt="DOWNLOAD" />
-                                        </button>
-                                        <button class="delete" type="button" onClick={() => deleteFile(f)}>
-                                            <img class="delete-img" src="https://www.svgrepo.com/show/533010/trash-alt.svg" alt="DELETE" />
-                                        </button>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     ))}
@@ -294,6 +344,17 @@ const FileList = ({dn, dp, email}) => {
                             <div class="file-upload-buttons">
                                 <button class="file-upload-button" onClick={uploadFile}>ADD FILE</button>
                                 <button class="file-upload-close" onClick={() => setIsPopupVisible(false)}>CLOSE</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+                <div class="share">
+                    { isShareVisible && (
+                        <div class="share-popup">
+                            <input type="text" class="share-input" placeholder="name@gmail.com" onChange={handleShareEmailChange}/>
+                            <div class="share-file-buttons">
+                                <button type="button" class="share-file-button" onClick={() => shareFile()}>SHARE</button>
+                                <button class="share-file-close" onClick={() => setIsShareVisible(false)}>CLOSE</button>
                             </div>
                         </div>
                     )}
