@@ -22,34 +22,68 @@ const storage = multer.diskStorage({
     },
 });
 
-app.get('/getFiles', (req, res) => {
-  const directoryPath = req.query.path || __dirname; // Change this to the path of the directory you want to list
-  console.log(directoryPath);
-  fs.readdir(directoryPath, (err, files) => {
-    if (err) {
-      return res.status(500).json({ error: 'Unable to read directory' });
-    }
+function formatSize(size) {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0;
+  while (size >= 1024 && i < units.length - 1) {
+      size /= 1024;
+      i++;
+  }
+  return `${size.toFixed(2)} ${units[i]}`;
+}
 
-    const results = fs.readdirSync(directoryPath);
-      const fileDetails = results.filter(res => fs.lstatSync(path.resolve(directoryPath, res)).isFile())
-    console.log("sending")
-    res.json(fileDetails);
+app.get('/getFiles', (req, res) => {
+  const path = req.query.path;
+
+  // Use fs.readdir to get the list of files/folders
+  fs.readdir(path, (err, items) => {
+      if (err) {
+          return res.status(500).json({ error: 'Error reading directory' });
+      }
+      try {
+        const fileDetails = items.filter((item) => fs.statSync(`${path}/${item}`).isFile()).map((file) => {
+                const stats = fs.statSync(`${path}/${file}`);
+                const formattedDate = stats.birthtime.toISOString().split('T')[0];
+                return {
+                    name: file,
+                    size: formatSize(stats.size), // Size in bytes
+                    createdAt: formattedDate, // Creation date
+                };
+        });
+        res.json(fileDetails);
+      } catch (error) {
+        res.json([]);
+      }
+
   });
 });
 
 app.get('/getFolders', (req, res) => {
-    const directoryPath = req.query.path || __dirname; // Change this to the path of the directory you want to list
-  
-    fs.readdir(directoryPath, (err, files) => {
+  const path = req.query.path;
+
+  // Use fs.readdir to get the list of files/folders
+  fs.readdir(path, (err, items) => {
       if (err) {
-        return res.status(500).json({ error: 'Unable to read directory' });
+          return res.status(500).json({ error: 'Error reading directory' });
       }
-  
-      const results = fs.readdirSync(directoryPath);
-      const fileDetails = results.filter(res => fs.lstatSync(path.resolve(directoryPath, res)).isDirectory())
-      console.log("sending")
-      res.json(fileDetails);
-    });
+      try{
+      const fileDetails = items.filter((item) => fs.statSync(`${path}/${item}`).isDirectory()).map((file) => {
+            const stats = fs.statSync(`${path}/${file}`);
+            const formattedDate = stats.birthtime.toISOString().split('T')[0];
+            
+
+            return {
+              name: file,
+              size: formatSize(stats.size), // Size in bytes
+              createdAt: formattedDate, // Creation date
+            };
+          });
+          res.json(fileDetails);
+        } catch (error) {
+          res.json([]);
+        }
+
+  });
 });
 
 app.get('/downloadFile', (req, res)=> {
@@ -117,7 +151,7 @@ app.delete('/deleteFolder', async (req, res) => {
     }
   
     try {
-        await fsPromises.rmdir(deletePath, { recursive: true }); // recursive: true deletes directories and their contents
+        await fsPromises.rm(deletePath, { recursive: true }); // recursive: true deletes directories and their contents
         res.json({ message: 'Path deleted successfully!' });
     } catch (error) {
         console.error('Error deleting path:', error);
@@ -140,6 +174,31 @@ app.post('/createFolder', async (req, res) => {
       res.status(500).json({ error: 'Internal server error' });
     }
   });
+
+  app.post('/shareFile', async (req, res) => {
+    try {
+        const { sourceFilePath, destinationPath } = req.query;
+
+        // Validate and process the parameters
+        if (!sourceFilePath || !destinationPath) {
+            return res.status(400).json({ error: 'Invalid parameters' });
+        }
+
+        // Check if the source file exists
+        if (!fs.existsSync(sourceFilePath)) {
+            return res.status(404).json({ error: 'Source file not found' });
+        }
+
+        // Create a symbolic link to the source file in the destination path
+        const destinationFile = path.join(destinationPath, path.basename(sourceFilePath));
+        fs.symlinkSync(sourceFilePath, destinationFile);
+
+        res.json({ message: 'File shared successfully' });
+    } catch (error) {
+        console.error('Error sharing file:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
